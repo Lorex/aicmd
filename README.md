@@ -4,6 +4,8 @@ Ever wished your terminal understood plain English (or Chinese)? Tired of Googli
 
 Built with bash, curl, and jq (because we're fancy like that), AICMD turns your natural language into Linux commands faster than you can say "man page".
 
+For Chinese users, please refer to [README_zh-TW.md](README_zh-TW.md).
+
 ## Features
 - 🤖 Automatically generate Linux commands using AI
 - 🌐 Multi-language support (Traditional Chinese/English)
