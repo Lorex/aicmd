@@ -23,13 +23,16 @@
 
 ## 安裝方法
 
-1. 使用以下一行指令安裝：
-
+1. 首先，下載並安裝 AICMD：
 ```bash
-curl -sSL https://raw.githubusercontent.com/Lorex/aicmd/main/install.sh | bash -s -- install
+curl -sSL https://raw.githubusercontent.com/Lorex/aicmd/refs/heads/master/aicmd-conf -O && curl -sSL https://raw.githubusercontent.com/Lorex/aicmd/refs/heads/master/ai -O && curl -sSL https://raw.githubusercontent.com/Lorex/aicmd/refs/heads/master/.config.template -O && mkdir -p i18n && cd i18n && curl -sSL https://raw.githubusercontent.com/Lorex/aicmd/refs/heads/master/i18n/{load_lang,zh_TW,en}.sh -O && cd .. && sudo bash aicmd-conf install && cd - >/dev/null 2>&1
 ```
-2. 按照提示選擇語言（繁體中文/English）
-3. 輸入您的 OpenAI API 金鑰
+
+2. 接著設定您的偏好：
+```bash
+aicmd-conf set-key    # 設定您的 OpenAI API 金鑰
+aicmd-conf lang       # 選擇您偏好的語言
+```
 
 ## 使用方法
 
