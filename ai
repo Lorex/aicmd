@@ -1,0 +1,322 @@
+#!/bin/bash
+
+# Check configuration file
+if [ ! -f ~/.aicmd/config ] || ! grep -q "^OPENAI_API_KEY=" ~/.aicmd/config || ! grep -q "^OPENAI_API_URL=" ~/.aicmd/config || ! grep -q "^OPENAI_MODEL=" ~/.aicmd/config; then
+	echo "Configuration file is missing or corrupted. Running aicmd-conf to fix..."
+	aicmd-conf set-key
+	if [ $? -ne 0 ]; then
+		echo "Failed to set up configuration. Please run 'aicmd-conf set-key' manually."
+		exit 1
+	fi
+fi
+
+# Load configuration
+source ~/.aicmd/config
+
+# Check if OPENAI_API_KEY is set
+if [ -z "$OPENAI_API_KEY" ]; then
+	echo "Error: OPENAI_API_KEY is not set. Please run 'aicmd-conf set-key' to set your API key."
+	exit 1
+fi
+
+# Load configuration from config file
+if [ -f ~/.aicmd/config ]; then
+	source ~/.aicmd/config
+	if [ -z "$OPENAI_API_URL" ]; then
+		echo "Error: OpenAI API URL not found in ~/.aicmd/config"
+		echo "Please run the installation script again to set up your configuration"
+		exit 1
+	fi
+	if [ -z "$OPENAI_MODEL" ]; then
+		echo "Error: OpenAI Model not found in ~/.aicmd/config"
+		echo "Please run the installation script again to set up your configuration"
+		exit 1
+	fi
+else
+	echo "Error: Configuration file not found at ~/.aicmd/config"
+	echo "Please run the installation script to set up your configuration"
+	exit 1
+fi
+
+# Check if command contains [[UNSAFE]] tag
+check_unsafe_tag() {
+	if [[ "$*" == *"[[UNSAFE]]"* ]]; then
+		echo "true"
+	else
+		echo "false"
+	fi
+}
+
+# Remove [[UNSAFE]] tag from command
+remove_unsafe_tag() {
+	echo "$*" | sed 's/\[\[UNSAFE\]\]//g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+# Error handling functions
+handle_error() {
+	local error_type=$1
+	local message=$2
+	local reason=""
+	
+	case $error_type in
+		"UNSAFE")
+			reason="Unsafe command detected, to use the command, please add \"[[UNSAFE]]\" in your prompt.
+i.e. \"ai format disk\" -> \"ai format disk [[UNSAFE]]\" or \"[[UNSAFE]] ai format disk\""
+			;;
+		"EMPTY")
+			reason="No command suggested."
+			;;
+		*)
+			reason="Unknown error type."
+			;;
+	esac
+	
+	echo "> Command rejected: $reason"
+	exit 1
+}
+
+handle_command() {
+	local command=$1
+	local is_fix_mode=$2
+	
+	# Check for dangerous commands only if not in unsafe mode
+	if [ "$IS_UNSAFE" != "true" ] && [[ "$command" =~ ^rm\ -rf\ /|^mkfs\.|^dd\ if=|^:\(\)\{\s*:\|^chmod\ 777|^chown\ root:|^mkfs\.|^dd\ if=|^mkfs\.|^dd\ if=|^mkfs\. ]]; then
+		handle_error "UNSAFE" "Unsafe command detected"
+	fi
+	
+	# Check for empty command
+	if [ -z "$command" ]; then
+		handle_error "EMPTY" "No command generated"
+	fi
+	
+	# Display command and ask for confirmation
+	echo "> Command: $command"
+	read -p "> Execute? (y/n) " CONFIRM
+	
+	if [[ "$CONFIRM" = "y" || "$CONFIRM" = "Y" ]]; then
+		if [ "$is_fix_mode" = "true" ]; then
+			eval "$command"
+		else
+			bash -c "$command"
+		fi
+	else
+		echo "> Cancelled."
+		exit 0
+	fi
+}
+
+if [ "$#" -eq 0 ]; then
+	handle_error "EMPTY" "Please provide a prompt. Usage: $0 list files"
+fi
+
+ORIGINAL_PROMPT="$*"
+IS_UNSAFE=$(check_unsafe_tag "$ORIGINAL_PROMPT")
+CLEAN_PROMPT=$(remove_unsafe_tag "$ORIGINAL_PROMPT")
+
+if [[ "$1" = "fix" ]]; then
+	echo "> Fix Mode"
+	
+	# Get intent if provided
+	INTENT=""
+	if [ "$#" -gt 1 ]; then
+		shift  # Remove "fix" from arguments
+		INTENT="$*"
+	fi
+
+	# echo "> Intent: $INTENT"
+
+	# Find the last non-ai-fix command using fc command
+	LAST_COMMAND=""
+	LAST_COMMAND_NUM=0
+	
+	# Try multiple methods to get command history
+	ALL_COMMANDS=""
+	
+	# Method 1: Try using fc command
+	# echo "> Trying fc command..."
+	FC_COMMANDS=$(fc -ln 100 2>/dev/null)
+	if [ -n "$FC_COMMANDS" ]; then
+		ALL_COMMANDS="$FC_COMMANDS"
+		# echo "> Successfully retrieved commands using fc"
+	fi
+	
+	# Method 2: If fc fails, try using history command
+	if [ -z "$ALL_COMMANDS" ]; then
+		# echo "> Trying history command..."
+		# Try to force enable history command and capture output
+		HISTSIZE=100
+		set -o history
+		HIST_COMMANDS=$(bash -c "history 100" 2>/dev/null | sed 's/^[[:space:]]*[0-9][0-9]*[[:space:]]*//')
+		if [ -n "$HIST_COMMANDS" ]; then
+			ALL_COMMANDS="$HIST_COMMANDS"
+			# echo "> Successfully retrieved commands using history"
+		fi
+	fi
+	
+	# Method 3: If both previous methods fail, read bash_history file directly
+	if [ -z "$ALL_COMMANDS" ]; then
+		# echo "> Trying to read bash_history file..."
+		# Find the correct history file location
+		HISTORY_FILE="$HOME/.bash_history"
+		if [ -f "$HISTORY_FILE" ]; then
+			HIST_FILE_COMMANDS=$(tail -n 100 "$HISTORY_FILE")
+			if [ -n "$HIST_FILE_COMMANDS" ]; then
+				ALL_COMMANDS="$HIST_FILE_COMMANDS"
+				# echo "> Successfully retrieved commands from $HISTORY_FILE"
+			fi
+		fi
+	fi
+	
+	# If all methods fail, try to get the last command directly
+	if [ -z "$ALL_COMMANDS" ]; then
+		echo "> Trying to get last command directly..."
+		# Try to get the last command provided by user
+		POTENTIAL_LAST_CMD=$(bash -c "echo \$BASH_COMMAND" 2>/dev/null)
+		if [ -n "$POTENTIAL_LAST_CMD" ] && [ "$POTENTIAL_LAST_CMD" != "$0 fix" ] && [ "$POTENTIAL_LAST_CMD" != "./ai fix" ]; then
+			ALL_COMMANDS="$POTENTIAL_LAST_CMD"
+			# echo "> Using current command: $ALL_COMMANDS"
+		fi
+	fi
+	
+	# Check if command history was successfully retrieved
+	if [ -z "$ALL_COMMANDS" ]; then
+		echo "> Failed to retrieve command history through any method"
+		echo "> Please manually enter the command you want to fix:"
+		read -p "> " MANUAL_COMMAND
+		if [ -n "$MANUAL_COMMAND" ]; then
+			LAST_COMMAND="$MANUAL_COMMAND"
+			echo "> Using manually entered command: $LAST_COMMAND"
+		else
+			handle_error "EMPTY" "No command provided to fix."
+		fi
+	else
+		# Modified filtering logic to find the last command not starting with ai or ./ai
+		LAST_COMMAND=$(echo "$ALL_COMMANDS" | grep -v "^[[:space:]]*ai[[:space:]]" | grep -v "^[[:space:]]*ai$" | grep -v "^[[:space:]]*\./ai[[:space:]]" | grep -v "^[[:space:]]*\./ai$" | grep -v "^[[:space:]]*$" | tail -n 1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+		
+		if [ -n "$LAST_COMMAND" ]; then
+			:
+		else
+			echo "> No valid command found in history"
+			echo "> Please manually enter the command you want to fix:"
+			read -p "> " MANUAL_COMMAND
+			if [ -n "$MANUAL_COMMAND" ]; then
+				LAST_COMMAND="$MANUAL_COMMAND"
+				echo "> Using manually entered command: $LAST_COMMAND"
+			else
+				handle_error "EMPTY" "No command provided to fix."
+			fi
+		fi
+	fi
+	
+	echo "> Last failed command: $LAST_COMMAND"
+	
+	# Get command context (previous 5 commands) if we have history
+	if [ -n "$ALL_COMMANDS" ]; then
+		# Modified logic for getting command history, excluding commands starting with ai or ./ai
+		COMMAND_HISTORY=($(echo "$ALL_COMMANDS" | grep -v "^[[:space:]]*ai[[:space:]]" | grep -v "^[[:space:]]*ai$" | grep -v "^[[:space:]]*\./ai[[:space:]]" | grep -v "^[[:space:]]*\./ai$" | grep -v "^[[:space:]]*$" | tail -n 6 | head -n 5))
+		
+		# Debug: Show collected history
+		# echo "> Collected command history:"
+		# printf '%s\n' "${COMMAND_HISTORY[@]}"
+		
+		# Convert command history array to JSON array
+		COMMAND_HISTORY_JSON=$(printf '%s\n' "${COMMAND_HISTORY[@]}" | jq -R . | jq -s .)
+	else
+		# If no history is available, just use the current command
+		COMMAND_HISTORY=("$LAST_COMMAND")
+		COMMAND_HISTORY_JSON=$(echo "$LAST_COMMAND" | jq -R . | jq -s .)
+	fi
+	
+	# Execute the last command and get error code
+	eval "$LAST_COMMAND" 2>/dev/null
+	LAST_ERROR=$?
+	
+	if [[ "$LAST_ERROR" == "0" ]]; then
+		echo "> Previous command executed successfully, no fix needed."
+		exit 0
+	fi
+	
+	# echo "> Error code: $LAST_ERROR"
+	
+	# Prepare request data
+	REQUEST_JSON=$(jq -n \
+		--arg model "$OPENAI_MODEL" \
+		--arg cmd "$LAST_COMMAND" \
+		--arg err "$LAST_ERROR" \
+		--arg intent "$INTENT" \
+		--argjson history "$COMMAND_HISTORY_JSON" \
+		--arg unsafe "$IS_UNSAFE" \
+		'{
+			"model": $model,
+			"messages": [
+				{
+					"role": "system",
+					"content": "You are a Linux command fixer. Analyze the command and error message provided by the user and output the correct command. If the error message indicates missing command or system packages, generate installation commands. Output only the command without explanations. If you cannot generate a command, return an empty string. If unsafe=true, you may include dangerous commands, otherwise, output \"::REJECTED:UNSAFE\"."
+				},
+				{
+					"role": "user",
+					"content": ("Command history:\n" + ($history | join("\n")) + "\nFailed command: " + $cmd + "\nError code: " + $err + (if $intent != "" then "\nUser intent: " + $intent else "" end) + "\nunsafe: " + $unsafe)
+				}
+			],
+			"temperature": 0.2
+		}')
+
+	# Send request to OpenAI API
+	RESPONSE=$(curl -s "$OPENAI_API_URL" \
+		-H "Content-Type: application/json" \
+		-H "Authorization: Bearer $OPENAI_API_KEY" \
+		-d "$REQUEST_JSON")
+	
+	# Parse response
+	FIX_RESPONSE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "::REJECTED:EMPTY"')
+	
+	# Handle the response
+	if [[ "$FIX_RESPONSE" == "::REJECTED:"* ]]; then
+		handle_error "${FIX_RESPONSE#::REJECTED:}" "Command rejected"
+	fi
+	
+	handle_command "$FIX_RESPONSE" "true"
+else
+	# Normal mode: Generate command
+	TEMP_FILE=$(mktemp)
+	echo "$CLEAN_PROMPT" > "$TEMP_FILE"
+	QUERY=$(jq -Rs . < "$TEMP_FILE")
+	rm "$TEMP_FILE"
+
+	REQUEST_JSON=$(jq -n \
+		--arg model "$OPENAI_MODEL" \
+		--arg content "$QUERY" \
+		--arg unsafe "$IS_UNSAFE" \
+		'{
+			"model": $model,
+			"messages": [
+				{
+					"role": "system",
+					"content": "You are a Linux command generator. Follow these rules in order:\n1. If the command is dangerous (like rm -rf /, mkfs, dd, etc.) and unsafe=false, output \"::REJECTED:UNSAFE\"\n2. If unsafe=true, you may output any command including dangerous ones\n3. If no command can be suggested, output \"::REJECTED:EMPTY\"\n4. Output only the command without explanations"
+				},
+				{
+					"role": "user",
+					"content": ("intent: " + $content + "\nunsafe: " + $unsafe)
+				}
+			],
+			"temperature": 0
+		}')
+
+	# echo "$REQUEST_JSON"
+
+	RESPONSE=$(curl -s "$OPENAI_API_URL" \
+		-H "Content-Type: application/json" \
+		-H "Authorization: Bearer $OPENAI_API_KEY" \
+		-d "$REQUEST_JSON")
+
+	# echo "$RESPONSE"
+
+	COMMAND=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "::REJECTED:EMPTY"')
+	
+	# Handle the response
+	if [[ "$COMMAND" == "::REJECTED:"* ]]; then
+		handle_error "${COMMAND#::REJECTED:}" "Command rejected"
+	fi
+	
+	handle_command "$COMMAND" "false"
+fi

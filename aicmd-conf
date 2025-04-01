@@ -1,0 +1,287 @@
+#!/bin/bash
+
+# 取得腳本實際位置
+if [ -L "$0" ]; then
+    # 如果是符號連結，取得實際路徑
+    SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+else
+    # 如果不是符號連結，直接取得目錄
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
+
+# 載入語言系統
+source "$SCRIPT_DIR/i18n/load_lang.sh"
+
+# Function to check and fix configuration
+check_and_fix_config() {
+    echo "$(get_message "CHECKING_CONFIG")"
+    if [ ! -f ~/.aicmd/config ] || ! grep -q "^OPENAI_API_KEY=" ~/.aicmd/config || ! grep -q "^OPENAI_API_URL=" ~/.aicmd/config || ! grep -q "^OPENAI_MODEL=" ~/.aicmd/config; then
+        echo "$(get_message "CONFIG_MISSING")"
+        echo "$(get_message "COPYING_TEMPLATE")"
+        mkdir -p ~/.aicmd
+        cp /usr/local/lib/aicmd/.config.template ~/.aicmd/config
+        
+        # Add language selection
+        echo "$(get_message "LANG_SELECT")"
+        echo -e "$(get_message "LANG_OPTIONS")"
+        read -p "$(get_message "LANG_PROMPT")" lang_choice
+        case $lang_choice in
+            1)
+                echo -e "\nLANGUAGE=zh_TW" >> ~/.aicmd/config
+                ;;
+            2)
+                echo -e "\nLANGUAGE=en" >> ~/.aicmd/config
+                ;;
+            *)
+                echo -e "\nLANGUAGE=zh_TW" >> ~/.aicmd/config
+                ;;
+        esac
+        
+        read -p "$(get_message "ENTER_KEY")" api_key
+        if [ -n "$api_key" ]; then
+            sed -i "s|^OPENAI_API_KEY=.*|OPENAI_API_KEY=$api_key|" ~/.aicmd/config
+            echo "$(get_message "KEY_SUCCESS")"
+        else
+            echo "$(get_message "KEY_ERROR")"
+            exit 1
+        fi
+    fi
+}
+
+# Function to install AICMD
+install_aicmd() {
+    # Get absolute path of the current directory
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    
+    # Detect package manager
+    if command -v apt-get >/dev/null 2>&1; then
+        PKG_MANAGER="apt-get"
+        UPDATE_CMD="apt-get update"
+        INSTALL_CMD="apt-get install -y"
+    elif command -v dnf >/dev/null 2>&1; then
+        PKG_MANAGER="dnf"
+        UPDATE_CMD="dnf check-update"
+        INSTALL_CMD="dnf install -y"
+    elif command -v yum >/dev/null 2>&1; then
+        PKG_MANAGER="yum"
+        UPDATE_CMD="yum check-update"
+        INSTALL_CMD="yum install -y"
+    else
+        echo "$(get_message "PKG_MANAGER_ERROR")"
+        exit 1
+    fi
+
+    # Update system packages
+    echo "$(get_message "UPDATING")"
+    $UPDATE_CMD
+
+    # Install required dependencies
+    echo "$(get_message "INSTALLING_DEPS")"
+    case $PKG_MANAGER in
+        "apt-get")
+            $INSTALL_CMD curl jq
+            ;;
+        "dnf"|"yum")
+            $INSTALL_CMD curl jq
+            ;;
+    esac
+
+    # Create installation directory
+    INSTALL_DIR="/usr/local/lib/aicmd"
+    mkdir -p "$INSTALL_DIR"
+
+    # Copy files to installation directory
+    echo "$(get_message "COPYING_FILES")"
+    cp "$SCRIPT_DIR/ai" "$INSTALL_DIR/"
+    cp "$SCRIPT_DIR/aicmd-conf" "$INSTALL_DIR/"
+    cp "$SCRIPT_DIR/.config.template" "$INSTALL_DIR/"
+    
+    # Create i18n directory and copy language files
+    mkdir -p "$INSTALL_DIR/i18n"
+    cp "$SCRIPT_DIR/i18n/load_lang.sh" "$INSTALL_DIR/i18n/"
+    cp "$SCRIPT_DIR/i18n/zh_TW.sh" "$INSTALL_DIR/i18n/"
+    cp "$SCRIPT_DIR/i18n/en.sh" "$INSTALL_DIR/i18n/"
+
+    # Set execution permissions
+    echo "$(get_message "SETTING_PERM")"
+    chmod +x "$INSTALL_DIR/ai" "$INSTALL_DIR/aicmd-conf"
+    chmod +x "$INSTALL_DIR/i18n/"*.sh
+
+    # Create symbolic links to /usr/local/bin
+    echo "$(get_message "CREATING_LINK")"
+    ln -sf "$INSTALL_DIR/ai" /usr/bin/ai
+    ln -sf "$INSTALL_DIR/aicmd-conf" /usr/bin/aicmd-conf
+
+    # 重新載入語言系統
+    source "$INSTALL_DIR/i18n/load_lang.sh"
+
+    # Check and fix configuration
+    echo "$(get_message "CHECKING_CONFIG")"
+    if [ ! -f ~/.aicmd/config ]; then
+        echo "$(get_message "CONFIG_MISSING")"
+        echo "$(get_message "COPYING_TEMPLATE")"
+        mkdir -p ~/.aicmd
+        cp "$INSTALL_DIR/.config.template" ~/.aicmd/config
+    fi
+
+    # Add language selection
+    echo "$(get_message "LANG_SELECT")"
+    echo -e "$(get_message "LANG_OPTIONS")"
+    read -p "$(get_message "LANG_PROMPT")" lang_choice
+    case $lang_choice in
+        1)
+            sed -i "s|^LANGUAGE=.*|LANGUAGE=zh_TW|" ~/.aicmd/config || echo -e "\nLANGUAGE=zh_TW" >> ~/.aicmd/config
+            ;;
+        2)
+            sed -i "s|^LANGUAGE=.*|LANGUAGE=en|" ~/.aicmd/config || echo -e "\nLANGUAGE=en" >> ~/.aicmd/config
+            ;;
+        *)
+            sed -i "s|^LANGUAGE=.*|LANGUAGE=zh_TW|" ~/.aicmd/config || echo -e "\nLANGUAGE=zh_TW" >> ~/.aicmd/config
+            ;;
+    esac
+
+    # 重新載入語言系統以應用新的語言設定
+    source "$INSTALL_DIR/i18n/load_lang.sh"
+
+    # 設定 API Key
+    echo "$(get_message "ENTER_KEY")"
+    read -p "" api_key
+    if [ -n "$api_key" ]; then
+        if grep -q "^OPENAI_API_KEY=" ~/.aicmd/config; then
+            sed -i "s|^OPENAI_API_KEY=.*|OPENAI_API_KEY=$api_key|" ~/.aicmd/config
+        else
+            echo "OPENAI_API_KEY=$api_key" >> ~/.aicmd/config
+        fi
+        echo "$(get_message "KEY_SUCCESS")"
+    else
+        echo "$(get_message "KEY_ERROR")"
+        exit 1
+    fi
+
+    echo "$(get_message "COMPLETED")"
+    echo "$(get_message "USAGE")"
+    echo "$(get_message "USAGE_AI")"
+    echo "$(get_message "USAGE_CONF")"
+    echo "$(get_message "USAGE_NORMAL")"
+    echo "$(get_message "USAGE_FIX")"
+}
+
+# Function to uninstall AICMD
+uninstall_aicmd() {
+    echo "$(get_message "UNINSTALLING")"
+    
+    # Remove symbolic links
+    echo "$(get_message "REMOVING_LINKS")"
+    rm -f /usr/bin/ai
+    rm -f /usr/bin/aicmd-conf
+    
+    # Remove installation directory
+    echo "$(get_message "REMOVING_FILES")"
+    rm -rf /usr/local/lib/aicmd
+    
+    # Remove configuration files
+    echo "$(get_message "REMOVING_CONFIG")"
+    rm -rf ~/.aicmd
+    
+    echo "$(get_message "UNINSTALL_COMPLETED")"
+}
+
+# Function to set API Key
+set_api_key() {
+    # 重新載入語言系統
+    SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+    source "$SCRIPT_DIR/i18n/load_lang.sh"
+    
+    echo "$(get_message "CHECKING_CONFIG")"
+    if [ ! -f ~/.aicmd/config ]; then
+        echo "$(get_message "CONFIG_MISSING")"
+        echo "$(get_message "COPYING_TEMPLATE")"
+        mkdir -p ~/.aicmd
+        cp /usr/local/lib/aicmd/.config.template ~/.aicmd/config
+    fi
+    
+    read -p "$(get_message "ENTER_KEY")" api_key
+    if [ -n "$api_key" ]; then
+        if grep -q "^OPENAI_API_KEY=" ~/.aicmd/config; then
+            sed -i "s|^OPENAI_API_KEY=.*|OPENAI_API_KEY=$api_key|" ~/.aicmd/config
+        else
+            echo "OPENAI_API_KEY=$api_key" >> ~/.aicmd/config
+        fi
+        echo "$(get_message "KEY_SUCCESS")"
+    else
+        echo "$(get_message "KEY_ERROR")"
+        exit 1
+    fi
+}
+
+# Function to change language
+change_language() {
+    echo "$(get_message "LANG_SELECT")"
+    echo -e "$(get_message "LANG_OPTIONS")"
+    read -p "$(get_message "LANG_PROMPT")" lang_choice
+    case $lang_choice in
+        1)
+            sed -i "s|^LANGUAGE=.*|LANGUAGE=zh_TW|" ~/.aicmd/config
+            echo "$(get_message "LANG_SET") 繁體中文"
+            ;;
+        2)
+            sed -i "s|^LANGUAGE=.*|LANGUAGE=en|" ~/.aicmd/config
+            echo "$(get_message "LANG_SET") English"
+            ;;
+        *)
+            echo "$(get_message "INVALID_OPTION")"
+            exit 1
+            ;;
+    esac
+}
+
+# Check if running as root for installation and uninstallation
+if [ "$1" = "install" ] || [ "$1" = "uninstall" ]; then
+    if [ "$EUID" -ne 0 ]; then 
+        echo "$(get_message "ROOT_REQUIRED")"
+        exit 1
+    fi
+fi
+
+# Main menu
+if [ "$1" = "install" ]; then
+    install_aicmd
+elif [ "$1" = "uninstall" ]; then
+    read -p "$(get_message "UNINSTALL_CONFIRM")" confirm
+    if [[ $confirm =~ ^[Yy]$ ]]; then
+        uninstall_aicmd
+    fi
+elif [ "$1" = "set-key" ]; then
+    set_api_key
+elif [ "$1" = "lang" ]; then
+    change_language
+else
+    echo "$(get_message "SELECT_ACTION")"
+    echo "$(get_message "OPTION_INSTALL")"
+    echo "$(get_message "OPTION_UNINSTALL")"
+    echo "$(get_message "OPTION_SET_KEY")"
+    echo "$(get_message "OPTION_LANG")"
+    read -p "$(get_message "LANG_PROMPT")" action
+
+    case $action in
+        1)
+            install_aicmd
+            ;;
+        2)
+            read -p "$(get_message "UNINSTALL_CONFIRM")" confirm
+            if [[ $confirm =~ ^[Yy]$ ]]; then
+                uninstall_aicmd
+            fi
+            ;;
+        3)
+            set_api_key
+            ;;
+        4)
+            change_language
+            ;;
+        *)
+            echo "$(get_message "INVALID_OPTION")"
+            exit 1
+            ;;
+    esac
+fi 
