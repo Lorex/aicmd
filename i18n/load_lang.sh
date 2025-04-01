@@ -1,27 +1,27 @@
 #!/bin/bash
 
-# 載入語言設定
+# Load language settings
 if [ -f ~/.aicmd/config ]; then
     source ~/.aicmd/config
 fi
 
-# 如果沒有設定語言，預設使用繁體中文
+# If no language is set, use Traditional Chinese by default
 if [ -z "$LANGUAGE" ]; then
     LANGUAGE="zh_TW"
 fi
 
-# 取得腳本所在目錄
+# Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# 載入語言文件
+# Load language file
 if [ -f "$SCRIPT_DIR/${LANGUAGE}.sh" ]; then
     source "$SCRIPT_DIR/${LANGUAGE}.sh"
 else
-    # 如果找不到指定的語言文件，使用英文
+    # If the specified language file is not found, use English
     source "$SCRIPT_DIR/en.sh"
 fi
 
-# 取得訊息函數
+# Get message function
 get_message() {
     local key="$1"
     if [ -n "${messages[$key]}" ]; then

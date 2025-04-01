@@ -1,120 +1,131 @@
-# Lorex's AI Command Helper
+# Lorex's AI Shell Command Helper
 
-AICMD 是一個 Linux 指令輔助工具，能讓使用者透過自然語言描述來執行系統操作，或是修復你打爛的指令。
+Ever wished your terminal understood plain English (or Chinese)? Tired of Googling "how to list files in Linux" for the 100th time? Meet AICMD - your new best friend in the command line! It's like having a super-smart assistant who actually understands what "show me what's in this folder" means (and won't judge you for asking).
 
-## 功能
-- 🤖 使用 AI 自動生成 Linux 指令
-- 🔧 自動修復執行失敗的指令
-- 🌐 支援多語言（繁體中文/English）
-- 🔒 內建安全機制，防止手殘執行到危險指令
-- ⚙️ 簡單的配置管理系統
+Built with bash, curl, and jq (because we're fancy like that), AICMD turns your natural language into Linux commands faster than you can say "man page".
 
-## 安裝要求
+## Features
+- 🤖 Automatically generate Linux commands using AI
+- 🌐 Multi-language support (Traditional Chinese/English)
+- 🔒 Built-in safety mechanisms to prevent dangerous commands
+- ⚙️ Simple configuration management
 
-- Linux 作業系統
-- root 權限（用於安裝）
-- 支援的套件管理器：apt-get、dnf 或 yum
-- OpenAI API 金鑰
+## System Requirements
 
-## 安裝方法
+- Debian or Fedora based Linux systems
+   - Root privileges
+   - Supported package managers: apt-get, dnf, or yum
+   - *(PowerShell not supported, Windows users please find alternatives)*
+- System packages (will be automatically installed if missing)
+   - curl
+   - jq
+- OpenAI API key
 
-1. 下載 AICMD 安裝腳本
-   ```bash
-   git clone https://github.com/Lorex/aicmd.git
-   ```
-2. 執行安裝命令：
-   ```bash
-   sudo ./aicmd-conf install
-   ```
-3. 按照提示選擇語言（繁體中文/English）
-4. 輸入您的 OpenAI API 金鑰
+## Installation
 
-## 使用方法
+1. Copy-paste this magic spell into your terminal:
+```bash
+curl -sSL https://raw.githubusercontent.com/Lorex/aicmd/main/install.sh | bash -s -- install
+```
+2. Select language (Traditional Chinese/English)
+3. Enter your OpenAI API key
 
-### 一般模式
+## Usage
 
-使用自然語言描述您想要執行的操作：
+### The `ai` Command (Your New Best Friend)
+
+Just tell it what you want, like you're talking to a very smart rubber duck:
 
 ```bash
-ai 列出當前目錄下的所有文件
+$ ai who am i?
+> Command: whoami    # AI generated command
+> Execute? (y/n) y   # Enter y to execute
+yourDaddy            # Execution result
 ```
 
-### 修復模式
+### Safety First: The `[[UNSAFE]]` Tag
 
-如果某個命令執行失敗，可以使用修復模式：
-
+Try something dangerous, and AICMD will be like your mom:
 ```bash
-ai fix 修復上一個失敗的命令
+$ ai format my computer
+> Command rejected: Unsafe command detected, to use the command, please add "[[UNSAFE]]" in your prompt.
+i.e. "ai format disk" -> "ai format disk [[UNSAFE]]" or "[[UNSAFE]] ai format disk"
 ```
 
-### 安全機制
-
-對於危險命令（如 `rm -rf /`、`mkfs` 等），需要添加 `[[UNSAFE]]` 標記：
-
+If you're feeling brave (or foolish):
 ```bash
-ai 格式化磁盤 [[UNSAFE]]
+$ ai format my computer [[UNSAFE]]      # Add [[UNSAFE]] tag
+> Command: mkfs.ext4 /dev/sda1         # AI will generate the correct command
+> Execute? (y/n) n                     # Enter n to cancel if you're unsure
+> Cancelled.
 ```
 
-### 語言切換
+### Language Switching
 
-您可以使用以下方式切換語言：
+You can switch languages using these methods:
 
-1. 使用 `aicmd-conf` 選單：
+1. Using the `aicmd-conf` menu:
    ```bash
    aicmd-conf
    ```
-   然後選擇選項 4 進行語言切換
+   Then select option 4 to switch language
 
-2. 直接使用命令：
+2. Direct command:
    ```bash
    aicmd-conf lang
    ```
 
-3. 使用 `ai` 命令：
+3. Using the `ai` command:
    ```bash
-   ai lang zh_TW  # 切換到繁體中文
-   ai lang en     # 切換到英文
+   ai lang zh_TW  # Switch to Traditional Chinese
+   ai lang en     # Switch to English
    ```
 
-## 配置管理
+## Management Tool
 
-使用以下命令管理配置：
+AICMD provides the `aicmd-conf` command for configuration management:
 
+1. The menu way (for bash babies):
+   ```bash
+   aicmd-conf
+   ```
+   Then select an option for configuration management
+   ```bash
+   $ ./aicmd-conf 
+   Please select an action:
+   1. Install AICMD
+   2. Uninstall AICMD
+   3. Set API Key
+   4. Change Language
+   ```
+
+2. The command way (for keyboard warriors):
 ```bash
-aicmd-conf set-key    # 設置 OpenAI API 金鑰
-aicmd-conf install    # 安裝 AICMD
-aicmd-conf uninstall  # 解除安裝 AICMD
-aicmd-conf lang       # 切換語言
+aicmd-conf set-key    # Set OpenAI API key
+aicmd-conf install    # Install AICMD
+aicmd-conf uninstall  # Uninstall AICMD
+aicmd-conf lang       # Switch language
 ```
 
-## 解除安裝
+## Uninstallation
 
-要解除安裝 AICMD，執行：
+To uninstall AICMD, run:
 
 ```bash
 sudo aicmd-conf uninstall
 ```
 
-## 注意事項
+## Important Notes
 
-- 請確保妥善保管您的 OpenAI API 金鑰
-- 使用危險命令時請務必謹慎，並添加 `[[UNSAFE]]` 標記
-- 建議在執行生成的命令前仔細檢查
-- 語言設定會保存在 `~/.aicmd/config` 文件中
+- Keep your API key secret (treat it like your Netflix password)
+- Dangerous commands need the [[UNSAFE]] tag
+- Always double-check commands
+- Your preferences are saved in `~/.aicmd/config`
 
-## 授權
+## License
 
-本專案採用 MIT 授權條款。詳見 [LICENSE](LICENSE) 文件。
+This project is licensed under the Apache 2.0 License. See the [LICENSE](LICENSE) file for details.
 
-## 貢獻
+## Contributing
 
-歡迎提交 Issue 和 Pull Request 來改進這個專案。
-
-## 作者
-
-[您的名字/組織]
-
-## 致謝
-
-- OpenAI 提供強大的 API 服務
-- 所有貢獻者的付出 
+If you encounter any issues or want to contribute, feel free to submit Issues and Pull Requests.

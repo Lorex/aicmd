@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# 取得腳本實際位置
+# Get the actual script location
 if [ -L "$0" ]; then
-    # 如果是符號連結，取得實際路徑
+    # If it's a symbolic link, get the actual path
     SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 else
-    # 如果不是符號連結，直接取得目錄
+    # If not a symbolic link, get the directory directly
     SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 fi
 
-# 載入語言系統
+# Load language system
 source "$SCRIPT_DIR/i18n/load_lang.sh"
 
 # Function to check and fix configuration
@@ -112,7 +112,7 @@ install_aicmd() {
     ln -sf "$INSTALL_DIR/ai" /usr/bin/ai
     ln -sf "$INSTALL_DIR/aicmd-conf" /usr/bin/aicmd-conf
 
-    # 重新載入語言系統
+    # Reload language system
     source "$INSTALL_DIR/i18n/load_lang.sh"
 
     # Check and fix configuration
@@ -140,10 +140,10 @@ install_aicmd() {
             ;;
     esac
 
-    # 重新載入語言系統以應用新的語言設定
+    # Reload language system to apply new language settings
     source "$INSTALL_DIR/i18n/load_lang.sh"
 
-    # 設定 API Key
+    # Set API Key
     echo "$(get_message "ENTER_KEY")"
     read -p "" api_key
     if [ -n "$api_key" ]; then
@@ -188,7 +188,7 @@ uninstall_aicmd() {
 
 # Function to set API Key
 set_api_key() {
-    # 重新載入語言系統
+    # Reload language system
     SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
     source "$SCRIPT_DIR/i18n/load_lang.sh"
     
