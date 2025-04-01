@@ -25,16 +25,12 @@ For Chinese users, please refer to [README_zh-TW.md](README_zh-TW.md).
 
 ## Installation
 
-1. First, download and install AICMD:
+1. Copy-paste this magic spell into your terminal:
 ```bash
 curl -sSL https://raw.githubusercontent.com/Lorex/aicmd/refs/heads/master/aicmd-conf -O && curl -sSL https://raw.githubusercontent.com/Lorex/aicmd/refs/heads/master/ai -O && curl -sSL https://raw.githubusercontent.com/Lorex/aicmd/refs/heads/master/.config.template -O && mkdir -p i18n && cd i18n && curl -sSL https://raw.githubusercontent.com/Lorex/aicmd/refs/heads/master/i18n/{load_lang,zh_TW,en}.sh -O && cd .. && sudo bash aicmd-conf install && cd - >/dev/null 2>&1
 ```
-
-2. Then configure your settings:
-```bash
-aicmd-conf set-key    # Set your OpenAI API key
-aicmd-conf lang       # Select your preferred language
-```
+2. Select language (Traditional Chinese/English)
+3. Enter your OpenAI API key
 
 ## Usage
 
